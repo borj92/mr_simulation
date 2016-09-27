@@ -166,31 +166,42 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
                        
             %Locate nodes adjacent to current node
             
-            adjacentVertexIdx = find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows')); %Nodes are listed from 0, in initial list, and 1 everywhere else for some STUPID reason.
-            adjacentVertex = tissue.adata(2).Val(find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows')),2);
+            nextVertexIdx = find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows')); %Nodes are listed from 0, in initial list, and 1 everywhere else for some STUPID reason.
+            nextVertex = tissue.adata(2).Val(find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows')),2);
+            prevVertexIdx = find(ismember(tissue.adata(2).Val(:,2), walker.cvx-1, 'rows'));
+            prevVertex = tissue.adata(2).Val(find(ismember(tissue.adata(2).Val(:,2), walker.cvx-1, 'rows')),1);
             %Index of current vertex and adjacent vertices in edge list 
             edgeIndex = sum(tissue.adata(3).Val(1:(find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows'),1))))-1; %Not even sure why this -1 is needed... But IT IS.
-            adVertexEdgeIdx = zeros(size(adjacentVertex));
-            for i = 1:length(adjacentVertex)
-                adVertexEdgeIdx = sum(tissue.adata(3).Val(1:adjacentVertexIdx(i)));
+            nxtVertexEdgeIdx = zeros(size(nextVertex));
+            prvVertexEdgeIdx = zeros(size(prevVertex));
+            
+            for i = 1:length(nextVertex)
+                nxtVertexEdgeIdx = sum(tissue.adata(3).Val(1:nextVertexIdx(i)));
             end
+            
+            for i = 1:length(prevVertex)
+                prvVertexEdgeIdx = sum(tissue.adata(3).Val(1:prevVertexIdx(i)));
+            end
+            
+            %Change - to handle previous vertex also, may flow backwards if
+            %pressure dictates.
 
-            if(isempty(adjacentVertex)) %Node is termination pointk
+            if(isempty(nextVertex)) %Node is termination pointk
                 walker.lab = NaN; %Leak out into tissue.
                 return;
-            elseif(length(adjacentVertex > 1)) %Node is a bifurcation/trifurcation point
+            elseif(length(nextVertex > 1)) %Node is a bifurcation/trifurcation point
 
                 %Decide which node to propagate to based on pressure drop
                 currentVertexPressure = tissue.adata(7).Val(edgeIndex);
                 
-                adVertexPressures = zeros(size(adjacentVertex));
-                for i = 1:length(adVertexPressures)
-                    adVertexPressures(i) = tissue.adata(7).Val(adVertexEdgeIdx(i));
+                nxtVertexPressures = zeros(size(nextVertex));
+                for i = 1:length(nxtVertexPressures)
+                    nxtVertexPressures(i) = tissue.adata(7).Val(nxtVertexEdgeIdx(i));
                 end
                 
             else %Node is continuous
                 currentVertexPressure = tissue.adata(7).Val(edgeIndex);
-                nextVertexPressure = tissue.adata(7).Val(edgeIndex + tissue.adata(3).Val(adjacentVertexIdx));
+                nextVertexPressure = tissue.adata(7).Val(edgeIndex + tissue.adata(3).Val(nextVertexIdx));
             end
             
 
