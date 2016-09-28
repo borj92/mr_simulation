@@ -172,21 +172,23 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
             prevVertex = tissue.adata(2).Val(find(ismember(tissue.adata(2).Val(:,2), walker.cvx-1, 'rows')),1);
             %Index of current vertex and adjacent vertices in edge list 
             edgeIndex = sum(tissue.adata(3).Val(1:(find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows'),1))))-1; %Not even sure why this -1 is needed... But IT IS.
+            
+            %Pre-allocate for speed
             nxtVertexEdgeIdx = zeros(size(nextVertex));
             prvVertexEdgeIdx = zeros(size(prevVertex));
             
-            for i = 1:length(nextVertex)
-                nxtVertexEdgeIdx = sum(tissue.adata(3).Val(1:nextVertexIdx(i)));
+            for v = 1:length(nextVertex)
+                nxtVertexEdgeIdx(v) = sum(tissue.adata(3).Val(1:nextVertexIdx(v)));
             end
             
-            for i = 1:length(prevVertex)
-                prvVertexEdgeIdx = sum(tissue.adata(3).Val(1:prevVertexIdx(i)));
+            for v = 1:length(prevVertex)
+                prvVertexEdgeIdx(v) = sum(tissue.adata(3).Val(1:prevVertexIdx(v)))-1; %NOW I KNOW... because it's the source node, and so is indexed first;
             end
             
             %Change - to handle previous vertex also, may flow backwards if
             %pressure dictates.
 
-            if(isempty(nextVertex)) %Node is termination pointk
+            if(isempty(nextVertex)) %Node is termination point
                 walker.lab = NaN; %Leak out into tissue.
                 return;
             elseif(length(nextVertex > 1)) %Node is a bifurcation/trifurcation point
@@ -195,11 +197,25 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
                 currentVertexPressure = tissue.adata(7).Val(edgeIndex);
                 
                 nxtVertexPressures = zeros(size(nextVertex));
-                for i = 1:length(nxtVertexPressures)
-                    nxtVertexPressures(i) = tissue.adata(7).Val(nxtVertexEdgeIdx(i));
+                prvVertexPressures = zeros(size(prevVertex));
+                for v = 1:length(nxtVertexPressures)
+                    nxtVertexPressures(v) = tissue.adata(7).Val(nxtVertexEdgeIdx(v));
+                end
+                
+                for v = 1:length(prvVertexPressures)
+                    prvVertexPressures(v) = tissue.adata(7).Val(prvVertexEdgeIdx(v));
+                end
+                
+                %Pressure drops
+                nxtVertexDrops = zeros(size(nextVertex));
+                prvVertexDrops = zeros(size(prevVertex));
+                
+                for v = 1:length(nxtVertexDrops)
+                    
                 end
                 
             else %Node is continuous
+                prevVertexPressure = tissue.adata(7).Val(prvVertexEdgeIdx);
                 currentVertexPressure = tissue.adata(7).Val(edgeIndex);
                 nextVertexPressure = tissue.adata(7).Val(edgeIndex + tissue.adata(3).Val(nextVertexIdx));
             end
