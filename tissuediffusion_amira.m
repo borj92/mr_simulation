@@ -198,21 +198,27 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
                 
                 nxtVertexPressures = zeros(size(nextVertex));
                 prvVertexPressures = zeros(size(prevVertex));
+                
+                %Pressure drops
+                nxtVertexDrops = zeros(size(nextVertex), 2);
+                prvVertexDrops = zeros(size(prevVertex), 2);
+                
                 for v = 1:length(nxtVertexPressures)
                     nxtVertexPressures(v) = tissue.adata(7).Val(nxtVertexEdgeIdx(v));
+                    nxtVertexDrops(v, 1) = currentVertexPressure - nxtVertexPressures(v);
+                    nxtVertexDrops(v, 2) = nxtVertexEdgeIdx(v);
                 end
                 
                 for v = 1:length(prvVertexPressures)
                     prvVertexPressures(v) = tissue.adata(7).Val(prvVertexEdgeIdx(v));
+                    prvVertexDrops(v, 1) = currentVertexPressure - prvVertexPressures(v);
+                    prvVertexDrops(v, 2) = prvVertexEdgeIdx(v);
                 end
+                               
                 
-                %Pressure drops
-                nxtVertexDrops = zeros(size(nextVertex));
-                prvVertexDrops = zeros(size(prevVertex));
+                pDrops = [nxtVertexDrops; prvVertexDrops];%Concatenate pressure drops
                 
-                for v = 1:length(nxtVertexDrops)
-                    
-                end
+                [M,ind] = min(pdrops(:,1));
                 
             else %Node is continuous
                 prevVertexPressure = tissue.adata(7).Val(prvVertexEdgeIdx);
