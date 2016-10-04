@@ -220,6 +220,8 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
                 [~,ind] = min(pDrops(:,1));
                 destIdx = pDrops(ind,2);
                 
+                %Hello
+                
             else %Node is continuous
                 prevVertexPressure = tissue.adata(7).Val(prvVertexEdgeIdx);
                 currentVertexPressure = tissue.adata(7).Val(edgeIndex);
