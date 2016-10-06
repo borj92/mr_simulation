@@ -163,72 +163,75 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
         %Need separate scatter function to handle walkers in vessels - It's FLOW time...
         
         if(walker.lab == 2)  %Will only catch after walker label assigned?
-                       
-            %Locate nodes adjacent to current node
-            
-            nextVertexIdx = find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows')); %Nodes are listed from 0, in initial list, and 1 everywhere else for some STUPID reason.
-            nextVertex = tissue.adata(2).Val(find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows')),2);
-            prevVertexIdx = find(ismember(tissue.adata(2).Val(:,2), walker.cvx-1, 'rows'));
-            prevVertex = tissue.adata(2).Val(find(ismember(tissue.adata(2).Val(:,2), walker.cvx-1, 'rows')),1);
-            %Index of current vertex and adjacent vertices in edge list 
-            edgeIndex = sum(tissue.adata(3).Val(1:(find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows'),1))))-1; %Not even sure why this -1 is needed... But IT IS.
-            
-            %Pre-allocate for speed
-            nxtVertexEdgeIdx = zeros(size(nextVertex));
-            prvVertexEdgeIdx = zeros(size(prevVertex));
-            
-            for v = 1:length(nextVertex)
-                nxtVertexEdgeIdx(v) = sum(tissue.adata(3).Val(1:nextVertexIdx(v)));
-            end
-            
-            for v = 1:length(prevVertex)
-                prvVertexEdgeIdx(v) = sum(tissue.adata(3).Val(1:prevVertexIdx(v)))-1; %NOW I KNOW... because it's the source node, and so is indexed first;
-            end
-            
-            %Change - to handle previous vertex also, may flow backwards if
-            %pressure dictates.
 
-            if(isempty(nextVertex)) %Node is termination point
-                walker.lab = NaN; %Leak out into tissue.
-                return;
-            elseif(length(nextVertex > 1)) %Node is a bifurcation/trifurcation point
+            %--------------------------------------------------------------
+            % Following section calculates the next MAIN vertex to flow to
+            % based on pressure drops
+            %--------------------------------------------------------------
+                
+                %Locate nodes adjacent to current node
+                nextVertexIdx = find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows')); %Nodes are listed from 0, in initial list, and 1 everywhere else for some STUPID reason.
+                nextVertex = tissue.adata(2).Val(find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows')),2);
+                prevVertexIdx = find(ismember(tissue.adata(2).Val(:,2), walker.cvx-1, 'rows'));
+                prevVertex = tissue.adata(2).Val(find(ismember(tissue.adata(2).Val(:,2), walker.cvx-1, 'rows')),1);
+                %Index of current vertex and adjacent vertices in edge list 
+                edgeIndex = sum(tissue.adata(3).Val(1:(find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows'),1))))-1; %Not even sure why this -1 is needed... But IT IS.
+
+                %Pre-allocate for speed
+                nxtVertexEdgeIdx = zeros(size(nextVertex));
+                prvVertexEdgeIdx = zeros(size(prevVertex));
+
+                for v = 1:length(nextVertex)
+                    nxtVertexEdgeIdx(v) = sum(tissue.adata(3).Val(1:nextVertexIdx(v)));
+                end
+
+                for v = 1:length(prevVertex)
+                    prvVertexEdgeIdx(v) = sum(tissue.adata(3).Val(1:prevVertexIdx(v)))-1; %NOW I KNOW... because it's the source node, and so is indexed first;
+                end
 
                 %Decide which node to propagate to based on pressure drop
                 currentVertexPressure = tissue.adata(7).Val(edgeIndex);
-                
+
                 nxtVertexPressures = zeros(size(nextVertex));
                 prvVertexPressures = zeros(size(prevVertex));
-                
+
                 %Pressure drops
-                nxtVertexDrops = zeros(size(nextVertex), 2);
-                prvVertexDrops = zeros(size(prevVertex), 2);
-                
+                nxtVertexDrops = zeros(size(nextVertex, 2));
+                prvVertexDrops = zeros(size(prevVertex, 2));
+
                 for v = 1:length(nxtVertexPressures)
                     nxtVertexPressures(v) = tissue.adata(7).Val(nxtVertexEdgeIdx(v));
-                    nxtVertexDrops(v, 1) = currentVertexPressure - nxtVertexPressures(v);
+                    nxtVertexDrops(v, 1) = nxtVertexPressures(v) - currentVertexPressure;
                     nxtVertexDrops(v, 2) = nxtVertexEdgeIdx(v);
                 end
-                
+
                 for v = 1:length(prvVertexPressures)
                     prvVertexPressures(v) = tissue.adata(7).Val(prvVertexEdgeIdx(v));
-                    prvVertexDrops(v, 1) = currentVertexPressure - prvVertexPressures(v);
+                    prvVertexDrops(v, 1) = prvVertexPressures(v) - currentVertexPressure;
                     prvVertexDrops(v, 2) = prvVertexEdgeIdx(v);
                 end
-                               
-                
+
+
                 pDrops = [nxtVertexDrops; prvVertexDrops];%Concatenate pressure drops
                 [~,ind] = min(pDrops(:,1));
                 destIdx = pDrops(ind,2);
+            %--------------------------------------------------------------
+            %destIdx is the index in the edgepoint list of the destination 
+            %vertex
+            %--------------------------------------------------------------
                 
-                %Hello
-                
-            else %Node is continuous
-                prevVertexPressure = tissue.adata(7).Val(prvVertexEdgeIdx);
-                currentVertexPressure = tissue.adata(7).Val(edgeIndex);
-                nextVertexPressure = tissue.adata(7).Val(edgeIndex + tissue.adata(3).Val(nextVertexIdx));
-            end
+            destPath = unique(tissue.adata(4).Val(edgeIndex:-1:destIdx,:), 'rows', 'stable');
+            [k,d] = dsearchn(destPath, [walker.x, walker.y, walker.z]);
+            walker.currentPathPos = destPath(k);
             
-
+            %Calculate directional cosines
+            
+            delta = destPath(k+1,:)-destPath(k,:); %Change in x,y,z
+            mag_u = sqrt(delta(1)^2 + delta(2)^2 + delta(3)^2);
+            
+            walker.ux = delta(1)/mag_u;
+            walker.uy = delta(2)/mag_u;
+            walker.uz = delta(3)/mag_u;
             
             
         end
