@@ -170,7 +170,11 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
             prevVertexIdx = find(tissue.adata(2).Val(:,2) == walker.cvx-1);
             prevVertex = tissue.adata(2).Val(prevVertexIdx,1);
             %Index of current vertex and adjacent vertices in edge list
-            edgeIndex = sum(tissue.adata(3).Val(1:(find(tissue.adata(2).Val(:,1) == walker.cvx-1))))-1; %Not even sure why this -1 is needed... But IT IS.
+            if(~isempty(nextVertexIdx))
+                edgeIndex = sum(tissue.adata(3).Val(1:(find(tissue.adata(2).Val(:,1) == walker.cvx-1))))-1; %Not even sure why this -1 is needed... But IT IS.
+            else
+                edgeIndex = sum(tissue.adata(3).Val(1:(find(tissue.adata(2).Val(:,2) == walker.cvx-1))))+1;
+            end
             
             %Pre-allocate for speed
             nxtVertexEdgeIdx = zeros(size(nextVertex));
@@ -208,7 +212,13 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
                 prvVertexDrops(v, 3) = prevVertex(v);
             end
             
-            pDrops = [nxtVertexDrops; prvVertexDrops];%Concatenate pressure drops
+            if(isempty(nextVertex))
+                pDrops = prvVertexDrops;
+            elseif(isempty(prevVertex))
+                pDrops = nxtVertexDrops;
+            else
+                pDrops = [nxtVertexDrops; prvVertexDrops];%Concatenate pressure drops
+            end
             [~,ind] = min(pDrops(:,1));
             destEdgeIdx = pDrops(ind,2);
             destVertex = pDrops(ind,3);
@@ -457,7 +467,7 @@ S = zeros(numwalkers, max_t/dt+2);
 T = zeros(numwalkers, max_t/dt+2);
 I = zeros(numwalkers, max_t/dt+2);
 
-for i = 1:numwalkers
+parfor i = 1:numwalkers
     
     Xtemp = zeros(1,max_t/dt);
     Ytemp = zeros(1,max_t/dt);
