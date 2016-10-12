@@ -165,12 +165,12 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
         if(walker.lab == 2)  %Will only catch after walker label assigned?
       
             %Locate nodes adjacent to current node
-            nextVertexIdx = find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows')); %Nodes are listed from 0, in initial list, and 1 everywhere else for some STUPID reason.
-            nextVertex = tissue.adata(2).Val(find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows')),2);
-            prevVertexIdx = find(ismember(tissue.adata(2).Val(:,2), walker.cvx-1, 'rows'));
-            prevVertex = tissue.adata(2).Val(find(ismember(tissue.adata(2).Val(:,2), walker.cvx-1, 'rows')),1);
+            nextVertexIdx = find(tissue.adata(2).Val(:,1) == walker.cvx-1); %Nodes are listed from 0, in initial list, and 1 everywhere else for some STUPID reason.
+            nextVertex = tissue.adata(2).Val(nextVertexIdx,2);
+            prevVertexIdx = find(tissue.adata(2).Val(:,2) == walker.cvx-1);
+            prevVertex = tissue.adata(2).Val(prevVertexIdx,1);
             %Index of current vertex and adjacent vertices in edge list
-            edgeIndex = sum(tissue.adata(3).Val(1:(find(ismember(tissue.adata(2).Val(:,1), walker.cvx-1, 'rows'),1))))-1; %Not even sure why this -1 is needed... But IT IS.
+            edgeIndex = sum(tissue.adata(3).Val(1:(find(tissue.adata(2).Val(:,1) == walker.cvx-1))))-1; %Not even sure why this -1 is needed... But IT IS.
             
             %Pre-allocate for speed
             nxtVertexEdgeIdx = zeros(size(nextVertex));
@@ -477,7 +477,6 @@ for i = 1:numwalkers
     j = j+1;
     while (walker.alive == 1)
         walker = stp(walker);
-        walker.t
         if(walker.didmove == 1)
             Xtemp(j) = walker.x;
             Ytemp(j) = walker.y;
