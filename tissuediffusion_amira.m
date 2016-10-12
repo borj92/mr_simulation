@@ -80,9 +80,9 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
                     end
                 else
                     index = ceil(rand * length(tissue.adata(1).Val));
-                    walker.x = tissue.adata(1).Val(index, 1);
-                    walker.y = tissue.adata(1).Val(index, 2);
-                    walker.z = tissue.adata(1).Val(index, 3);
+                    walker.x = tissue.adata(1).Val(index, 1) * 1e-6;
+                    walker.y = tissue.adata(1).Val(index, 2) * 1e-6;
+                    walker.z = tissue.adata(1).Val(index, 3) * 1e-6;
                     walker.cvx = index;
                     walker.lab = 2;
                 end
@@ -103,9 +103,9 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
             case 'vasc'
                 %Initialise only in the vasculature
                 index = ceil(rand * length(tissue.adata(1).Val));
-                walker.x = tissue.adata(1).Val(index, 1);
-                walker.y = tissue.adata(1).Val(index, 2);
-                walker.z = tissue.adata(1).Val(index, 3);
+                walker.x = tissue.adata(1).Val(index, 1) * 1e-6;
+                walker.y = tissue.adata(1).Val(index, 2) * 1e-6;
+                walker.z = tissue.adata(1).Val(index, 3) * 1e-6;
                 walker.cvx = index;
                 walker.lab = 2;
                 
@@ -132,9 +132,9 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
                     end
                 else
                     index = ceil(rand * length(tissue.adata(1).Val));
-                    walker.x = tissue.adata(1).Val(index, 1);
-                    walker.y = tissue.adata(1).Val(index, 2);
-                    walker.z = tissue.adata(1).Val(index, 3);
+                    walker.x = tissue.adata(1).Val(index, 1) * 1e-6;
+                    walker.y = tissue.adata(1).Val(index, 2) * 1e-6;
+                    walker.z = tissue.adata(1).Val(index, 3) * 1e-6;
                     walker.cvx = index; %Current walker vertex
                     walker.lab = 2;
                 end
@@ -191,34 +191,41 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
             prvVertexPressures = zeros(size(prevVertex));
             
             %Pressure drops
-            nxtVertexDrops = zeros(size(nextVertex, 2));
-            prvVertexDrops = zeros(size(prevVertex, 2));
+            nxtVertexDrops = zeros(size(nextVertex, 3));
+            prvVertexDrops = zeros(size(prevVertex, 3));
             
             for v = 1:length(nxtVertexPressures)
                 nxtVertexPressures(v) = tissue.adata(7).Val(nxtVertexEdgeIdx(v));
                 nxtVertexDrops(v, 1) = nxtVertexPressures(v) - currentVertexPressure;
                 nxtVertexDrops(v, 2) = nxtVertexEdgeIdx(v);
+                nxtVertexDrops(v, 3) = nextVertex(v);
             end
             
             for v = 1:length(prvVertexPressures)
                 prvVertexPressures(v) = tissue.adata(7).Val(prvVertexEdgeIdx(v));
                 prvVertexDrops(v, 1) = prvVertexPressures(v) - currentVertexPressure;
                 prvVertexDrops(v, 2) = prvVertexEdgeIdx(v);
+                prvVertexDrops(v, 3) = prevVertex(v);
             end
             
             pDrops = [nxtVertexDrops; prvVertexDrops];%Concatenate pressure drops
             [~,ind] = min(pDrops(:,1));
-            destIdx = pDrops(ind,2);
-            destPath = unique(tissue.adata(4).Val(edgeIndex:-1:destIdx,:), 'rows', 'stable');
+            destEdgeIdx = pDrops(ind,2);
+            destVertex = pDrops(ind,3);
+            if(edgeIndex > destEdgeIdx)
+                destPath = unique(tissue.adata(4).Val(edgeIndex:-1:destEdgeIdx,:), 'rows', 'stable');
+            else
+                destPath = unique(tissue.adata(4).Val(edgeIndex:destEdgeIdx, :), 'rows', 'stable');
+            end
             
             %------------------------------------------------------------------------------------------
             
-            [k,~] = dsearchn(destPath, [walker.x, walker.y, walker.z]);
+            [k,~] = dsearchn(destPath * 1e-6, [walker.x, walker.y, walker.z]);
             walker.currentPathPos = destPath(k);
             
             %Calculate directional cosines
             
-            if(k == length(destPath))
+            if(k == size(destPath, 1))
                 k = k-1;
             end
             
@@ -229,13 +236,16 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
             walker.uy = delta(2)/mag_u;
             walker.uz = delta(3)/mag_u;
             
-            %Calculate flow velocity
-            
+            %Calculate flow velocity           
             bloodVelocity = tissue.adata(6).Val(edgeIndex)/(60 * pi * (tissue.adata(5).Val(edgeIndex)*1e-6^2) * 1e12);
             
-            if(pdist([walker.x,walker.y,walker.z; tissue.adata(4).Val(destIdx,:)) < (bloodVelocity*dt)/2)
+            if(pdist([walker.x,walker.y,walker.z; tissue.adata(4).Val(destEdgeIdx,:)*1e-6]) < (bloodVelocity*dt)/2)
                 
-                walker.cvx;
+                walker.cvx = destVertex + 1;
+                walker.x = tissue.adata(1).Val(destVertex + 1, 1) * 1e-6;
+                walker.y = tissue.adata(1).Val(destVertex + 1, 2) * 1e-6;
+                walker.z = tissue.adata(1).Val(destVertex + 1, 3) * 1e-6;
+                walker = scat(walker,tissue); %recursive call
         
             end
             
@@ -447,7 +457,7 @@ S = zeros(numwalkers, max_t/dt+2);
 T = zeros(numwalkers, max_t/dt+2);
 I = zeros(numwalkers, max_t/dt+2);
 
-parfor i = 1:numwalkers
+for i = 1:numwalkers
     
     Xtemp = zeros(1,max_t/dt);
     Ytemp = zeros(1,max_t/dt);
@@ -467,6 +477,7 @@ parfor i = 1:numwalkers
     j = j+1;
     while (walker.alive == 1)
         walker = stp(walker);
+        walker.t
         if(walker.didmove == 1)
             Xtemp(j) = walker.x;
             Ytemp(j) = walker.y;
