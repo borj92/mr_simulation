@@ -21,7 +21,9 @@ function output = plotraj(traj,tissue,makevid)
             plot3(traj(:,3,i), traj(:,4,i), traj(:,5,i))
         end
     end
-    hull = hull_tree(tissue.vtree, 8e-6, [],[],[],'-s');
+    if(exist('tissue.vtree'))
+        hull = hull_tree(tissue.vtree, 8e-6, [],[],[],'-s');
+    end
     if(makevid == 1)
         filename = input('Enter filename: ', 's');
         options.FrameRate = 30; options.Duration = 10; options.Periodic = true;
