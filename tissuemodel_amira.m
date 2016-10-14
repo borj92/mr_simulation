@@ -1,4 +1,8 @@
-function [tissue] = tissuemodel_amira(dimx, dimy, dimz, ficvf, fee, fvasc, radius, di, dv, amira)
+function [tissue] = tissuemodel_amira(ficvf, fee, fvasc, radius, di, dv, amira)
+
+dimx = max(amira(4).Val(:,1)) * 1e-6;
+dimy = max(amira(4).Val(:,2)) * 1e-6;
+dimz = max(amira(4).Val(:,3)) * 1e-6;
 
 %Calculate voxel volume
 voxvol = dimx*dimy*dimz;
