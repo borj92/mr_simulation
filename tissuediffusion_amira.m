@@ -109,6 +109,15 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
                 walker.cvx = index;
                 walker.lab = 2;
                 
+            case 'vasc_single_seed'
+                
+                node = 20;
+                walker.x = tissue.adata(1).Val(node, 1) *1e-6;
+                walker.y = tissue.adata(1).Val(node, 2) *1e-6;
+                walker.z = tissue.adata(1).Val(node, 3) *1e-6;
+                walker.cvx = node;
+                walker.lab = 2;
+                
             otherwise
                 warning('Walker initialisation not recognised, defaulting to "random_quartile"');
                 chance = rand;
@@ -146,7 +155,7 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
         walker.alive = 1;
     end
 
-%Compute new direction
+%Compute new direction and step size in vessels
 
     function [walker] = scat(walker,tissue)
         walker.ux = -1 + (2*rand);
@@ -222,6 +231,23 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
             [~,ind] = min(pDrops(:,1));
             destEdgeIdx = pDrops(ind,2);
             destVertex = pDrops(ind,3);
+            
+            
+            
+            %Re-calculate edgeIndex depending on destIdx
+            
+            for v = 1:length(nextVertex)
+                if(destVertex == nextVertex(v))
+                    edgeIndex = sum(tissue.adata(3).Val(1:(nextVertexIdx(v))))-1;
+                end
+            end
+            
+            for v = 1:length(prevVertex)
+                if(destVertex == prevVertex(v))
+                    edgeIndex = sum(tissue.adata(3).Val(1:(prevVertexIdx(v))))+1;
+                end
+            end
+            
             if(edgeIndex > destEdgeIdx)
                 destPath = unique(tissue.adata(4).Val(edgeIndex:-1:destEdgeIdx,:), 'rows', 'stable');
             else
@@ -239,7 +265,7 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
                 k = k-1;
             end
             
-            delta = destPath(k+1,:)-destPath(k,:); %Change in x,y,z
+            delta = (destPath(k+1,:)*1e-6)-[walker.x, walker.y, walker.z]; %Change in x,y,z
             mag_u = sqrt(delta(1)^2 + delta(2)^2 + delta(3)^2);
             
             walker.ux = delta(1)/mag_u;
@@ -248,6 +274,9 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
             
             %Calculate flow velocity           
             bloodVelocity = tissue.adata(6).Val(edgeIndex)/(60 * pi * (tissue.adata(5).Val(edgeIndex)*1e-6^2) * 1e12);
+            
+            %May as well calculate step size while we're here...
+            walker.s = bloodVelocity * dt;
             
             if(pdist([walker.x,walker.y,walker.z; tissue.adata(4).Val(destEdgeIdx,:)*1e-6]) < (bloodVelocity*dt)/2)
                 
@@ -260,6 +289,9 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
             end
             
             
+        end
+        if(walker.lab ~= 2)
+            walker.s = sqrt(6*tissue.di*dt); %Always 3D
         end
     end
 
@@ -315,14 +347,6 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
         thit = 0;
         vhit = 0;
         %Calculate directional step sizes
-        walker.s = sqrt(6*tissue.di*dt); %Always 3D
-        %----------------------------------------------------------------------
-        % If walker is in vessels, need to calculate flow velocity
-        %----------------------------------------------------------------------
-        if(walker.lab == 2)
-            walker.s = 3e-4 * dt; %3e-4 is typical flow speed in capillaries, according to wikipedia...
-        end
-        %----------------------------------------------------------------------
         walker.sx = walker.s*walker.ux;
         walker.sy = walker.s*walker.uy;
         walker.sz = walker.s*walker.uz;
@@ -487,6 +511,8 @@ parfor i = 1:numwalkers
     j = j+1;
     while (walker.alive == 1)
         walker = stp(walker);
+%         walker.t
+%         walker.cvx
         if(walker.didmove == 1)
             Xtemp(j) = walker.x;
             Ytemp(j) = walker.y;
