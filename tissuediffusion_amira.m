@@ -232,6 +232,14 @@ function [traj, headerinfo, stats] = tissuediffusion_amira(tissue, numwalkers, m
             destEdgeIdx = pDrops(ind,2);
             destVertex = pDrops(ind,3);
             
+            %Add probabilistic method if tree is branching
+            
+            if(length(nextVertex) > 1 || length(prevVertex) > 1)
+                if(length(nextVertex) > 1)
+                    for v = 1:length(nextVertex)
+                        if(nextVertex(v) == destVertex)
+                            
+            
             
             
             %Re-calculate edgeIndex depending on destIdx
